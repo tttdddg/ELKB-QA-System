@@ -34,6 +34,9 @@ def create_app():
     from routes.chat import chat_bp
     from routes.user import user_bp
     from routes.stats import stats_bp
+    from routes.system_config import config_bp
+    from routes.kb_permission import perm_bp
+    from routes.prompt_template import tmpl_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(kb_bp, url_prefix='/api/knowledge_base')
@@ -41,6 +44,9 @@ def create_app():
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(stats_bp, url_prefix='/api/stats')
+    app.register_blueprint(config_bp, url_prefix='/api/system_config')
+    app.register_blueprint(perm_bp, url_prefix='/api/kb_permission')
+    app.register_blueprint(tmpl_bp, url_prefix='/api/prompt_template')
 
     return app
 

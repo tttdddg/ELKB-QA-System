@@ -34,6 +34,18 @@
             <el-icon><User /></el-icon>
             <template #title>用户管理</template>
           </el-menu-item>
+          <el-menu-item index="/kb-permission">
+            <el-icon><Lock /></el-icon>
+            <template #title>权限管理</template>
+          </el-menu-item>
+          <el-menu-item index="/prompt-template">
+            <el-icon><EditPen /></el-icon>
+            <template #title>Prompt模板</template>
+          </el-menu-item>
+          <el-menu-item index="/system-config">
+            <el-icon><Setting /></el-icon>
+            <template #title>系统配置</template>
+          </el-menu-item>
         </template>
         <!-- 通用菜单 -->
         <el-menu-item index="/chat">

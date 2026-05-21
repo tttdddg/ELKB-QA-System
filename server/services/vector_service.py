@@ -185,12 +185,15 @@ class VectorService:
         # 根据文档ID过滤并删除
         vectorstore._collection.delete(where={'doc_id': doc_id})
 
-    def get_retriever(self, kb_id):
+    def get_retriever(self, kb_id, top_k=None):
         """
         获取指定知识库的检索器
         :param kb_id: 知识库ID
+        :param top_k: 检索返回数量，默认使用配置
         :return: Chroma检索器
         """
+        if top_k is None:
+            top_k = current_app.config['RETRIEVER_TOP_K']
         collection_name = self._get_collection_name(kb_id)
         vectorstore = Chroma(
             collection_name=collection_name,
@@ -198,5 +201,23 @@ class VectorService:
             persist_directory=self.persist_dir
         )
         return vectorstore.as_retriever(
-            search_kwargs={'k': current_app.config['RETRIEVER_TOP_K']}
+            search_kwargs={'k': top_k}
         )
+
+    def similarity_search_with_score(self, kb_id, query, top_k=None):
+        """
+        带相似度分数的语义检索
+        :param kb_id: 知识库ID
+        :param query: 查询文本
+        :param top_k: 返回数量
+        :return: [(document, score), ...] 列表，score越小越相似(Chroma距离)
+        """
+        if top_k is None:
+            top_k = current_app.config['RETRIEVER_TOP_K']
+        collection_name = self._get_collection_name(kb_id)
+        vectorstore = Chroma(
+            collection_name=collection_name,
+            embedding_function=self.embeddings,
+            persist_directory=self.persist_dir
+        )
+        return vectorstore.similarity_search_with_score(query, k=top_k)

@@ -28,10 +28,25 @@
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="question" label="问题" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="answer" label="回答" min-width="300" show-overflow-tooltip />
-        <el-table-column prop="kb_name" label="知识库" width="130" />
-        <el-table-column prop="username" label="提问者" width="100" />
-        <el-table-column prop="create_time" label="时间" width="170" />
+        <el-table-column prop="answer" label="回答" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="kb_name" label="知识库" width="110" />
+        <el-table-column label="命中" width="70" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.hit_kb ? 'success' : 'warning'" size="small">{{ row.hit_kb ? '是' : '否' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="反馈" width="70" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.feedback === 'useful'" type="success" size="small">有用</el-tag>
+            <el-tag v-else-if="row.feedback === 'useless'" type="danger" size="small">无用</el-tag>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="response_time_ms" label="耗时" width="70" align="center">
+          <template #default="{ row }">{{ row.response_time_ms ? row.response_time_ms + 'ms' : '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="username" label="提问者" width="90" />
+        <el-table-column prop="create_time" label="时间" width="160" />
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="showDetail(row)">详情</el-button>
@@ -78,6 +93,36 @@
         <div class="detail-item">
           <div class="detail-label">知识库：</div>
           <div class="detail-value">{{ currentChat.kb_name }}</div>
+        </div>
+        <div class="detail-item" v-if="currentChat.response_time_ms">
+          <div class="detail-label">响应时间：</div>
+          <div class="detail-value">{{ currentChat.response_time_ms }}ms</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">命中知识库：</div>
+          <div class="detail-value">
+            <el-tag :type="currentChat.hit_kb ? 'success' : 'warning'" size="small">
+              {{ currentChat.hit_kb ? '是' : '否（兜底回答）' }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="detail-item" v-if="currentChat.retrieved_docs?.length">
+          <div class="detail-label">检索结果：</div>
+          <div class="detail-value">
+            <div v-for="(doc, i) in currentChat.retrieved_docs" :key="i" class="retrieved-row">
+              <el-tag size="small" type="info">#{{ i + 1 }} {{ doc.file_name }}</el-tag>
+              <span class="similarity-text">相似度 {{ (doc.similarity * 100).toFixed(1) }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="detail-item" v-if="currentChat.feedback">
+          <div class="detail-label">用户反馈：</div>
+          <div class="detail-value">
+            <el-tag :type="currentChat.feedback === 'useful' ? 'success' : 'danger'" size="small">
+              {{ currentChat.feedback === 'useful' ? '有用' : '无用' }}
+            </el-tag>
+            <span v-if="currentChat.feedback_reason" class="feedback-reason">{{ currentChat.feedback_reason }}</span>
+          </div>
         </div>
         <div class="detail-item">
           <div class="detail-label">时间：</div>
@@ -185,5 +230,28 @@ onMounted(() => {
 .source-tag {
   margin-right: 6px;
   margin-bottom: 4px;
+}
+
+.retrieved-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.similarity-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+.feedback-reason {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 8px;
+}
+
+.text-muted {
+  color: #c0c4cc;
+  font-size: 12px;
 }
 </style>

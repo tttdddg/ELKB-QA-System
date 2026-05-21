@@ -51,8 +51,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="create_time" label="上传时间" width="170" />
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
+            <el-button v-if="row.status === 'vectorized' || row.status === 'failed'" type="primary" link @click="handleReprocess(row.id)">
+              重新向量化
+            </el-button>
             <el-popconfirm title="确认删除该文档？" @confirm="handleDelete(row.id)">
               <template #reference>
                 <el-button type="danger" link>删除</el-button>
@@ -120,6 +123,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { getDocList, uploadDoc, deleteDoc } from '../api/document'
+import { reprocessDocument } from '../api/chat'
 import { getAllKB } from '../api/knowledge'
 
 const loading = ref(false)
@@ -189,6 +193,17 @@ async function handleUpload() {
     loadList()
   } finally {
     uploading.value = false
+  }
+}
+
+/** 重新向量化文档 */
+async function handleReprocess(id) {
+  try {
+    await reprocessDocument(id)
+    ElMessage.success('重新向量化成功')
+    loadList()
+  } catch (err) {
+    // handled by interceptor
   }
 }
 

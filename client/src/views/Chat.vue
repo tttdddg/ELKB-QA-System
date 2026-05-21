@@ -24,13 +24,29 @@
 
     <!-- 右侧对话区域 -->
     <div class="chat-main">
-      <!-- 对话窗口标题 -->
       <div class="chat-header">
         <span v-if="selectedKb">
           <el-icon><ChatDotRound /></el-icon>
           正在查询：{{ selectedKb.kb_name }}
         </span>
         <span v-else class="hint">请先从左侧选择一个知识库</span>
+
+        <!-- Prompt模板选择 -->
+        <el-select
+          v-if="selectedKb"
+          v-model="selectedTemplateId"
+          placeholder="Prompt模板"
+          size="small"
+          style="width: 180px; margin-left: auto;"
+          clearable
+        >
+          <el-option
+            v-for="t in templates"
+            :key="t.id"
+            :label="t.name"
+            :value="t.id"
+          />
+        </el-select>
       </div>
 
       <!-- 消息列表 -->
@@ -40,8 +56,12 @@
           <h3>欢迎使用企业知识库问答系统</h3>
           <p>请从左侧选择知识库，然后输入您的问题</p>
         </div>
-        <ChatMessage v-for="(msg, i) in messages" :key="i" :message="msg" />
-        <!-- 加载中提示 -->
+        <ChatMessage
+          v-for="(msg, i) in messages"
+          :key="i"
+          :message="msg"
+          @feedback="handleFeedback"
+        />
         <div v-if="asking" class="loading-msg">
           <el-avatar :size="36" :icon="Monitor" style="background-color: #67c23a" />
           <div class="loading-bubble">
@@ -78,57 +98,56 @@
 </template>
 
 <script setup>
-/**
- * 智能问答对话页面
- * 左侧选择知识库，右侧进行对话
- * 支持多轮对话，展示AI回答和参考来源
- */
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Promotion, Loading, Monitor } from '@element-plus/icons-vue'
 import { getAllKB } from '../api/knowledge'
-import { askQuestion } from '../api/chat'
+import { askQuestion, submitFeedback } from '../api/chat'
+import { getSelectableTemplates } from '../api/promptTemplate'
 import ChatMessage from '../components/ChatMessage.vue'
 
-/** 知识库列表 */
 const kbList = ref([])
-/** 当前选中的知识库 */
 const selectedKb = ref(null)
-/** 对话消息列表 */
 const messages = ref([])
-/** 当前输入的问题 */
 const question = ref('')
-/** 是否正在请求中 */
 const asking = ref(false)
-/** 当前会话ID */
 const sessionId = ref('')
-/** 消息列表DOM引用 */
 const messagesRef = ref(null)
+const templates = ref([])
+const selectedTemplateId = ref(null)
 
-/** 加载知识库列表 */
 async function loadKBList() {
   try {
     const res = await getAllKB()
     kbList.value = res.data
   } catch (err) {
-    // 错误已在拦截器处理
+    // handled by interceptor
   }
 }
 
-/** 选择知识库 */
+async function loadTemplates() {
+  if (!selectedKb.value) return
+  try {
+    const res = await getSelectableTemplates(selectedKb.value.id)
+    templates.value = res.data
+  } catch (err) {
+    // handled by interceptor
+  }
+}
+
 function selectKb(kb) {
   if (selectedKb.value?.id === kb.id) return
   selectedKb.value = kb
   messages.value = []
   sessionId.value = generateSessionId()
+  selectedTemplateId.value = null
+  loadTemplates()
 }
 
-/** 生成会话ID */
 function generateSessionId() {
   return 'sess_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-/** 自动滚动到底部 */
 async function scrollToBottom() {
   await nextTick()
   if (messagesRef.value) {
@@ -136,12 +155,10 @@ async function scrollToBottom() {
   }
 }
 
-/** 发送问题 */
 async function sendQuestion() {
   const q = question.value.trim()
   if (!q || !selectedKb.value || asking.value) return
 
-  // 添加用户消息
   messages.value.push({ role: 'user', content: q })
   question.value = ''
   asking.value = true
@@ -151,14 +168,19 @@ async function sendQuestion() {
     const res = await askQuestion({
       question: q,
       kb_id: selectedKb.value.id,
-      session_id: sessionId.value
+      session_id: sessionId.value,
+      template_id: selectedTemplateId.value || undefined
     })
 
-    // 添加AI回复
+    const data = res.data
     messages.value.push({
       role: 'ai',
-      content: res.data.answer,
-      sources: res.data.source_docs
+      content: data.answer,
+      sources: data.source_docs,
+      retrieved: data.retrieved_docs,
+      chatId: data.chat_id,
+      hitKb: data.hit_kb,
+      responseTime: data.response_time_ms
     })
   } catch (err) {
     messages.value.push({
@@ -168,6 +190,19 @@ async function sendQuestion() {
   } finally {
     asking.value = false
     scrollToBottom()
+  }
+}
+
+async function handleFeedback(chatId, feedback) {
+  try {
+    await submitFeedback(chatId, { feedback })
+    const msg = messages.value.find(m => m.chatId === chatId)
+    if (msg) {
+      msg.feedback = feedback
+    }
+    ElMessage.success(feedback === 'useful' ? '感谢您的反馈！' : '感谢反馈，我们会持续改进')
+  } catch (err) {
+    // handled by interceptor
   }
 }
 
@@ -184,7 +219,6 @@ onMounted(() => loadKBList())
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
-/* 左侧知识库选择栏 */
 .chat-sidebar {
   width: 260px;
   border-right: 1px solid #ebeef5;
@@ -218,20 +252,9 @@ onMounted(() => loadKBList())
   margin-bottom: 4px;
 }
 
-.kb-item:hover {
-  background: #ecf5ff;
-}
-
-.kb-item.active {
-  background: #409eff;
-  color: #fff;
-}
-
-.kb-item.active .el-tag {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.2);
-  border-color: transparent;
-}
+.kb-item:hover { background: #ecf5ff; }
+.kb-item.active { background: #409eff; color: #fff; }
+.kb-item.active .el-tag { color: #fff; background: rgba(255,255,255,0.2); border-color: transparent; }
 
 .kb-name {
   flex: 1;
@@ -248,7 +271,6 @@ onMounted(() => loadKBList())
   justify-content: center;
 }
 
-/* 右侧对话区域 */
 .chat-main {
   flex: 1;
   display: flex;
@@ -266,9 +288,7 @@ onMounted(() => loadKBList())
   gap: 6px;
 }
 
-.chat-header .hint {
-  color: #909399;
-}
+.chat-header .hint { color: #909399; }
 
 .chat-messages {
   flex: 1;
@@ -286,14 +306,8 @@ onMounted(() => loadKBList())
   gap: 12px;
 }
 
-.welcome h3 {
-  color: #909399;
-  font-size: 18px;
-}
-
-.welcome p {
-  font-size: 14px;
-}
+.welcome h3 { color: #909399; font-size: 18px; }
+.welcome p { font-size: 14px; }
 
 .loading-msg {
   display: flex;
@@ -314,7 +328,6 @@ onMounted(() => loadKBList())
   font-size: 14px;
 }
 
-/* 输入区域 */
 .chat-input {
   padding: 16px 20px;
   border-top: 1px solid #ebeef5;
@@ -324,9 +337,7 @@ onMounted(() => loadKBList())
   background: #fff;
 }
 
-.chat-input :deep(.el-textarea__inner) {
-  border-radius: 8px;
-}
+.chat-input :deep(.el-textarea__inner) { border-radius: 8px; }
 
 .send-btn {
   height: 54px;

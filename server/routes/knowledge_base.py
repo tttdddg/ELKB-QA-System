@@ -1,10 +1,11 @@
 """
 知识库路由
-提供知识库的增删改查接口
+提供知识库的增删改查接口（非管理员只能看到有权限的知识库）
 """
 from flask import Blueprint, request, g
 from models import db
 from models.knowledge_base import KnowledgeBase
+from models.kb_permission import KBPermission
 from utils.auth import login_required, admin_required
 from utils.response import success, error, page_response
 
@@ -17,7 +18,7 @@ kb_bp = Blueprint('knowledge_base', __name__)
 def get_list():
     """
     获取知识库列表（分页）
-    查询参数: page, page_size, keyword
+    非管理员只能看到有权限的知识库
     """
     page = request.args.get('page', 1, type=int)
     page_size = request.args.get('page_size', 10, type=int)
@@ -25,7 +26,11 @@ def get_list():
 
     query = KnowledgeBase.query.filter_by(status=1)
 
-    # 关键词搜索
+    # 非管理员只能看到有权限的知识库
+    if g.role != 'admin':
+        permitted_ids = db.session.query(KBPermission.kb_id).filter_by(user_id=g.user_id).subquery()
+        query = query.filter(KnowledgeBase.id.in_(permitted_ids))
+
     if keyword:
         query = query.filter(KnowledgeBase.kb_name.like(f'%{keyword}%'))
 
@@ -41,8 +46,13 @@ def get_list():
 def get_all():
     """
     获取所有启用的知识库（不分页，用于下拉选择）
+    非管理员只能看到有权限的知识库
     """
-    kb_list = KnowledgeBase.query.filter_by(status=1).order_by(KnowledgeBase.create_time.desc()).all()
+    query = KnowledgeBase.query.filter_by(status=1)
+    if g.role != 'admin':
+        permitted_ids = db.session.query(KBPermission.kb_id).filter_by(user_id=g.user_id).subquery()
+        query = query.filter(KnowledgeBase.id.in_(permitted_ids))
+    kb_list = query.order_by(KnowledgeBase.create_time.desc()).all()
     return success([kb.to_dict() for kb in kb_list])
 
 

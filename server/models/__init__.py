@@ -11,3 +11,6 @@ from models.user import User
 from models.knowledge_base import KnowledgeBase
 from models.document import Document
 from models.chat_history import ChatHistory
+from models.system_config import SystemConfig
+from models.kb_permission import KBPermission
+from models.prompt_template import PromptTemplate

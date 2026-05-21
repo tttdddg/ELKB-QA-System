@@ -19,3 +19,13 @@ export function getChatHistory(params) {
 export function getSessionChats(sessionId) {
   return request.get(`/chat/session/${sessionId}`)
 }
+
+/** 提交回答反馈 */
+export function submitFeedback(chatId, data) {
+  return request.post(`/chat/feedback/${chatId}`, data)
+}
+
+/** 重新向量化文档 */
+export function reprocessDocument(docId) {
+  return request.post(`/document/${docId}/reprocess`)
+}

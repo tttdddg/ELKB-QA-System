@@ -19,6 +19,13 @@ class ChatHistory(db.Model):
     question = db.Column(db.Text, nullable=False, comment='用户提问')
     answer = db.Column(db.Text, nullable=False, comment='AI回答')
     source_docs = db.Column(db.Text, default=None, comment='参考文档来源（JSON格式）')
+    retrieved_docs = db.Column(db.Text, default=None, comment='检索到的文档详情（JSON格式）')
+    prompt_text = db.Column(db.Text, default=None, comment='实际发送给LLM的完整Prompt')
+    response_time_ms = db.Column(db.Integer, default=None, comment='响应时间（毫秒）')
+    hit_kb = db.Column(db.Boolean, default=True, comment='是否命中知识库')
+    feedback = db.Column(db.String(20), default=None, comment='用户反馈: useful/useless')
+    feedback_reason = db.Column(db.String(200), default=None, comment='反馈原因')
+    feedback_time = db.Column(db.DateTime, default=None, comment='反馈时间')
     create_time = db.Column(db.DateTime, nullable=False, default=datetime.now, comment='创建时间')
 
     # 关联关系
@@ -34,6 +41,13 @@ class ChatHistory(db.Model):
             except (json.JSONDecodeError, TypeError):
                 source_list = []
 
+        retrieved_list = []
+        if self.retrieved_docs:
+            try:
+                retrieved_list = json.loads(self.retrieved_docs)
+            except (json.JSONDecodeError, TypeError):
+                retrieved_list = []
+
         return {
             'id': self.id,
             'user_id': self.user_id,
@@ -44,5 +58,12 @@ class ChatHistory(db.Model):
             'question': self.question,
             'answer': self.answer,
             'source_docs': source_list,
+            'retrieved_docs': retrieved_list,
+            'prompt_text': self.prompt_text,
+            'response_time_ms': self.response_time_ms,
+            'hit_kb': self.hit_kb,
+            'feedback': self.feedback,
+            'feedback_reason': self.feedback_reason,
+            'feedback_time': self.feedback_time.strftime('%Y-%m-%d %H:%M:%S') if self.feedback_time else None,
             'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else ''
         }

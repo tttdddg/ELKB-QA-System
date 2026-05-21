@@ -123,6 +123,57 @@ def upload():
     return success(doc.to_dict(), '上传成功')
 
 
+@doc_bp.route('/<int:doc_id>/reprocess', methods=['POST'])
+@admin_required
+def reprocess(doc_id):
+    """
+    重新向量化文档（删除旧向量 -> 重新分块 -> 重新嵌入）
+    仅管理员可用
+    """
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return error('文档不存在', 404)
+
+    if not os.path.exists(doc.file_path):
+        return error('原始文件不存在，无法重新处理')
+
+    kb_id = doc.kb_id
+    file_ext = doc.file_type
+    file_path = doc.file_path
+
+    try:
+        from services.vector_service import VectorService, OllamaServiceError
+        vector_service = VectorService()
+
+        # 删除旧向量
+        try:
+            vector_service.delete_document(doc.id, kb_id)
+        except Exception:
+            pass
+
+        # 重新分割和向量化
+        chunk_count = vector_service.process_document(doc.id, file_path, file_ext, kb_id)
+
+        doc.status = 'vectorized'
+        doc.chunk_count = chunk_count
+
+        kb = KnowledgeBase.query.get(kb_id)
+        if kb:
+            kb.doc_count = Document.query.filter_by(kb_id=kb_id, status='vectorized').count()
+
+        db.session.commit()
+    except OllamaServiceError as e:
+        doc.status = 'failed'
+        db.session.commit()
+        return error(str(e))
+    except Exception as e:
+        doc.status = 'failed'
+        db.session.commit()
+        return error(f'重新向量化失败: {str(e)}')
+
+    return success(doc.to_dict(), '重新向量化成功')
+
+
 @doc_bp.route('/<int:doc_id>', methods=['DELETE'])
 @admin_required
 def delete(doc_id):

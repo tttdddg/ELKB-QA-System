@@ -51,6 +51,24 @@ const routes = [
         name: 'ChatHistory',
         component: () => import('../views/ChatHistory.vue'),
         meta: { title: '对话历史' }
+      },
+      {
+        path: 'system-config',
+        name: 'SystemConfig',
+        component: () => import('../views/SystemConfig.vue'),
+        meta: { title: '系统配置', requireAdmin: true }
+      },
+      {
+        path: 'kb-permission',
+        name: 'KBPermission',
+        component: () => import('../views/KBPermission.vue'),
+        meta: { title: '权限管理', requireAdmin: true }
+      },
+      {
+        path: 'prompt-template',
+        name: 'PromptTemplate',
+        component: () => import('../views/PromptTemplate.vue'),
+        meta: { title: 'Prompt模板', requireAdmin: true }
       }
     ]
   }
